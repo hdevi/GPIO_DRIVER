@@ -14,12 +14,16 @@ static int state = 0;
 static struct class *gpio_class;
 static struct device *gpio_device;
 struct cdev gpio_dev;
+static dev_t devno;
+static int ret;
+
 
 module_param(state,int,0660);
 
 static int led_open(struct inode *pinode,struct file* pfile);
 static int led_close(struct inode *pinode,struct file *pfile);
-
+static ssize_t led_read(struct file *pfile,char __user *buffer,size_t len,loff_t *offset);
+static ssize_t led_write(struct file *pfile,const char __user *buffer,size_t len,loff_t *offset);
 
 
 static struct fileoperations led_ops = 
@@ -109,6 +113,72 @@ static int led_close(struct inode *pinode,struct file *pfile)
 	return 0;
 }
 
+
+static ssize_t led_read(struct file *pfile,char __user *buffer,size_t len,loff_t *offset)
+{
+	char temp_buffer[5];
+	int led_value;
+	printk(KERN_INFO "Reading Led State\n");
+	led_value = gpio_get_value(LEDPORT);
+	sprintf(temp_buffer,"%d",led_value);
+	len = sizeof(temp_buffer);
+	switch(buffer[0])
+	{
+		case '0':
+			printk(KERN_INFO "read 0\n");
+			gpio_set_value(LEDPORT,0);
+			break;
+	
+		case '1':
+			printk(KERN_INFO "read 1\n");
+			gpio_set_value(LEDPORT,1);
+			break;
+	}
+	
+	if(copy_to_user(buffer,temp_buffer,len))
+		return -EFAULT;
+
+	if(*offset == 0)
+	{
+		*offset += 1;
+		return 1;
+	}
+	else
+		return 0;
+
+	printk(KERN_INFO "Read Execution completed\n");
+	 	
+}
+
+static ssize_t led_write(struct file *pfile,const char __user *buffer,size_t len,loff_t *offset)
+{
+	char temp_buffer[5];
+	printk(KERN_INFO "Writing Led\n");
+	
+	if(copy_from_user(temp_buffer,buffer,1))
+		return -EFAULT;
+
+	switch(buffer[0])
+	{
+		case '0':
+			printk(KERN_INFO "Write 0\n");
+			gpio_set_value(LEDPORT,0);
+			break;
+	
+		case '1':
+			printk(KERN_INFO "Write 1\n");
+			gpio_set_value(LEDPORT,1);
+			break;
+
+		default:
+			printk(KERN_INFO "Invalid Option\n");
+			break;
+	}
+	
+	printk(KERN_INFO "Write Execution completed\n");
+	return len;
+	
+}
 
 module_init(gpio_init);
 module_exit(gpio_exit);
